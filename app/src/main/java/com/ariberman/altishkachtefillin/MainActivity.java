@@ -4,11 +4,15 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,306 +21,342 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
-import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
 
 public class MainActivity extends Activity {
 
-    private WebView webView;
+    private static final String WEBSITE_URL =
+            "https://mildly-puck-wcst1.shipped.cloud/";
 
     private static final String PREFS = "tefillin_prefs";
-    private static final String KEY_DONE_DATE = "done_date";
-    private static final String KEY_REMINDER_TIME = "reminder_time";
-    private static final String KEY_OVERLAY_ASKED = "overlay_asked";
+    private static final String KEY_RINGTONE = "ringtone_uri";
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 100;
 
-    private static final int NOTIFICATION_PERMISSION_CODE = 100;
-    private static final int OVERLAY_PERMISSION_CODE = 101;
+    private WebView webView;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
 
-        webView = findViewById(R.id.webView);
+        webView = new WebView(this);
+        setContentView(webView);
 
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setDatabaseEnabled(true);
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new WebChromeClient());
 
-        webView.addJavascriptInterface(new AndroidBridge(), "Android");
+        webView.addJavascriptInterface(
+                new AndroidBridge(),
+                "Android"
+        );
 
-        requestNotificationPermission();
-        requestOverlayPermissionOnce();
+        askNotificationPermission();
 
-        webView.loadUrl("https://mildly-puck-wcst1.shipped.cloud/");
+        webView.loadUrl(WEBSITE_URL);
     }
 
-    private void requestNotificationPermission() {
+    private void askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
 
                 requestPermissions(
                         new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                        NOTIFICATION_PERMISSION_CODE
+                        NOTIFICATION_PERMISSION_REQUEST
                 );
             }
         }
     }
 
-    private void requestOverlayPermissionOnce() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return;
-        }
+    private void requestExactAlarmPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarmManager =
+                    (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
-        if (Settings.canDrawOverlays(this)) {
-            return;
-        }
+            if (alarmManager != null &&
+                    !alarmManager.canScheduleExactAlarms()) {
 
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+                try {
+                    Intent intent = new Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                    );
 
-        boolean alreadyAsked = prefs.getBoolean(KEY_OVERLAY_ASKED, false);
+                    intent.setData(
+                            Uri.parse("package:" + getPackageName())
+                    );
 
-        if (!alreadyAsked) {
-            prefs.edit()
-                    .putBoolean(KEY_OVERLAY_ASKED, true)
-                    .apply();
-
-            Intent intent = new Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName())
-            );
-
-            try {
-                startActivityForResult(intent, OVERLAY_PERMISSION_CODE);
-            } catch (Exception ignored) {
+                    startActivity(intent);
+                } catch (Exception ignored) {
+                }
             }
         }
     }
 
-    private String todayKey() {
-        return new SimpleDateFormat(
-                "yyyy-MM-dd",
-                Locale.US
-        ).format(new Date());
-    }
-
-    private boolean isDoneToday() {
-        SharedPreferences prefs =
-                getSharedPreferences(PREFS, MODE_PRIVATE);
-
-        String doneDate =
-                prefs.getString(KEY_DONE_DATE, "");
-
-        return todayKey().equals(doneDate);
-    }
-
-    private void markDoneToday() {
-        SharedPreferences prefs =
-                getSharedPreferences(PREFS, MODE_PRIVATE);
-
-        prefs.edit()
-                .putString(KEY_DONE_DATE, todayKey())
-                .apply();
-
-        cancelAllReminderAlarms();
-        stopAlarmSound();
-
-        updateWebsiteState();
-    }
-
-    private void stopAlarmSound() {
-        Intent stopIntent =
-                new Intent("com.ariberman.altishkachtefillin.STOP_ALARM");
-
-        stopIntent.setPackage(getPackageName());
-        sendBroadcast(stopIntent);
-    }
-
-    private void cancelAllReminderAlarms() {
+    private void scheduleAlarm(long triggerAtMillis) {
         AlarmManager alarmManager =
                 (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
         Intent intent =
                 new Intent(this, ReminderReceiver.class);
 
-        for (int requestCode = 1000; requestCode <= 1010; requestCode++) {
-
-            PendingIntent pendingIntent =
-                    PendingIntent.getBroadcast(
-                            this,
-                            requestCode,
-                            intent,
-                            PendingIntent.FLAG_NO_CREATE |
-                                    PendingIntent.FLAG_IMMUTABLE
-                    );
-
-            if (pendingIntent != null) {
-                alarmManager.cancel(pendingIntent);
-                pendingIntent.cancel();
-            }
-        }
-    }
-
-    private void scheduleReminder(int hour, int minute) {
-
-        if (isDoneToday()) {
-            updateWebsiteState();
-            return;
-        }
-
-        Calendar now = Calendar.getInstance();
-        Calendar target = Calendar.getInstance();
-
-        target.set(Calendar.HOUR_OF_DAY, hour);
-        target.set(Calendar.MINUTE, minute);
-        target.set(Calendar.SECOND, 0);
-        target.set(Calendar.MILLISECOND, 0);
-
-        if (target.getTimeInMillis() <= now.getTimeInMillis()) {
-            return;
-        }
-
-        Intent intent =
-                new Intent(this, ReminderReceiver.class);
+        intent.setAction("TEFILLIN_REMINDER");
 
         PendingIntent pendingIntent =
                 PendingIntent.getBroadcast(
                         this,
-                        1000,
+                        5001,
                         intent,
                         PendingIntent.FLAG_UPDATE_CURRENT |
                                 PendingIntent.FLAG_IMMUTABLE
                 );
 
-        AlarmManager alarmManager =
-                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) {
+            return;
+        }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                     !alarmManager.canScheduleExactAlarms()) {
 
-                alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        target.getTimeInMillis(),
-                        pendingIntent
-                );
+                requestExactAlarmPermissionIfNeeded();
 
-            } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        target.getTimeInMillis(),
-                        pendingIntent
-                );
+                Toast.makeText(
+                        this,
+                        "צריך לאפשר לאפליקציה תזכורות מדויקות",
+                        Toast.LENGTH_LONG
+                ).show();
+
+                return;
             }
-        } else {
-            alarmManager.setExact(
+
+            alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    target.getTimeInMillis(),
+                    triggerAtMillis,
                     pendingIntent
             );
-        }
 
-        String time =
-                String.format(
-                        Locale.US,
-                        "%02d:%02d",
-                        hour,
-                        minute
+            getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .edit()
+                    .putLong("alarm_time", triggerAtMillis)
+                    .putBoolean("alarm_active", true)
+                    .apply();
+
+        } catch (SecurityException e) {
+            requestExactAlarmPermissionIfNeeded();
+        }
+    }
+
+    private void cancelAlarm() {
+        AlarmManager alarmManager =
+                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        Intent intent =
+                new Intent(this, ReminderReceiver.class);
+
+        intent.setAction("TEFILLIN_REMINDER");
+
+        PendingIntent pendingIntent =
+                PendingIntent.getBroadcast(
+                        this,
+                        5001,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT |
+                                PendingIntent.FLAG_IMMUTABLE
                 );
+
+        if (alarmManager != null) {
+            alarmManager.cancel(pendingIntent);
+        }
 
         getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
-                .putString(KEY_REMINDER_TIME, time)
+                .putBoolean("alarm_active", false)
+                .remove("alarm_time")
                 .apply();
     }
 
-    private void scheduleTenMinutes() {
+    private void showRingtoneChooser() {
+        RingtoneManager manager =
+                new RingtoneManager(this);
 
-        if (isDoneToday()) {
-            updateWebsiteState();
+        manager.setType(RingtoneManager.TYPE_ALARM);
+
+        Cursor cursor = manager.getCursor();
+
+        ArrayList<String> names = new ArrayList<>();
+        ArrayList<String> uris = new ArrayList<>();
+
+        int count = 0;
+
+        while (cursor.moveToNext() && count < 10) {
+            int position = cursor.getPosition();
+
+            Uri uri = manager.getRingtoneUri(position);
+
+            if (uri == null) {
+                continue;
+            }
+
+            Ringtone ringtone =
+                    RingtoneManager.getRingtone(this, uri);
+
+            String title;
+
+            try {
+                title = ringtone.getTitle(this);
+            } catch (Exception e) {
+                title = "צלצול " + (count + 1);
+            }
+
+            names.add((count + 1) + ". " + title);
+            uris.add(uri.toString());
+
+            count++;
+        }
+
+        cursor.close();
+
+        if (names.isEmpty()) {
+            Toast.makeText(
+                    this,
+                    "לא נמצאו צלצולי שעון מעורר",
+                    Toast.LENGTH_LONG
+            ).show();
             return;
         }
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.MINUTE, 10);
+        String[] ringtoneNames =
+                names.toArray(new String[0]);
 
-        Intent intent =
-                new Intent(this, ReminderReceiver.class);
+        new AlertDialog.Builder(this)
+                .setTitle("בחר צלצול לתזכורת")
+                .setItems(
+                        ringtoneNames,
+                        (dialog, which) -> {
 
-        PendingIntent pendingIntent =
-                PendingIntent.getBroadcast(
-                        this,
-                        1001,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT |
-                                PendingIntent.FLAG_IMMUTABLE
-                );
+                            String selectedUri =
+                                    uris.get(which);
 
-        AlarmManager alarmManager =
-                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                            getSharedPreferences(
+                                    PREFS,
+                                    MODE_PRIVATE
+                            )
+                                    .edit()
+                                    .putString(
+                                            KEY_RINGTONE,
+                                            selectedUri
+                                    )
+                                    .apply();
 
-        long triggerAt =
-                calendar.getTimeInMillis();
+                            playPreview(selectedUri);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            Toast.makeText(
+                                    this,
+                                    "הצלצול נשמר",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                )
+                .setNegativeButton("ביטול", null)
+                .show();
+    }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    !alarmManager.canScheduleExactAlarms()) {
+    private void playPreview(String uriString) {
+        try {
+            Uri uri = Uri.parse(uriString);
 
-                alarmManager.setAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAt,
-                        pendingIntent
-                );
+            Ringtone ringtone =
+                    RingtoneManager.getRingtone(this, uri);
 
-            } else {
-                alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAt,
-                        pendingIntent
-                );
+            if (ringtone != null) {
+                ringtone.play();
+
+                webView.postDelayed(() -> {
+                    try {
+                        if (ringtone.isPlaying()) {
+                            ringtone.stop();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }, 3000);
             }
 
-        } else {
+        } catch (Exception ignored) {
+        }
+    }
 
-            alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerAt,
-                    pendingIntent
+    public class AndroidBridge {
+
+        @JavascriptInterface
+        public void scheduleReminder(long timestamp) {
+            runOnUiThread(() ->
+                    scheduleAlarm(timestamp)
             );
         }
 
-        stopAlarmSound();
-    }
-
-    private void updateWebsiteState() {
-
-        if (webView == null) {
-            return;
+        @JavascriptInterface
+        public void setReminder(long timestamp) {
+            scheduleReminder(timestamp);
         }
 
-        boolean done = isDoneToday();
+        @JavascriptInterface
+        public void cancelReminder() {
+            runOnUiThread(() ->
+                    cancelAlarm()
+            );
+        }
 
-        String javascript =
-                "javascript:(function(){" +
-                "window.tefillinDoneToday=" + done + ";" +
-                "window.dispatchEvent(new CustomEvent('tefillinStateChanged'," +
-                "{detail:{done:" + done + "}}));" +
-                "})();";
+        @JavascriptInterface
+        public void chooseRingtone() {
+            runOnUiThread(() ->
+                    showRingtoneChooser()
+            );
+        }
 
-        webView.post(() ->
+        @JavascriptInterface
+        public String getSelectedRingtone() {
+            return getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            ).getString(KEY_RINGTONE, "");
+        }
+
+        @JavascriptInterface
+        public void markTefillinDone() {
+            getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            )
+                    .edit()
+                    .putBoolean("tefillin_done", true)
+                    .putBoolean("alarm_active", false)
+                    .apply();
+
+            runOnUiThread(() -> {
+                cancelAlarm();
+
                 webView.evaluateJavascript(
-                        javascript,
+                        "window.dispatchEvent(new CustomEvent('tefillinDone'));",
                         null
-                )
-        );
+                );
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isTefillinDone() {
+            return getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            ).getBoolean("tefillin_done", false);
+        }
     }
 
     @Override
@@ -324,91 +364,19 @@ public class MainActivity extends Activity {
         super.onResume();
 
         if (webView != null) {
-            updateWebsiteState();
+            webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('androidAppResumed'));",
+                    null
+            );
         }
     }
 
     @Override
     public void onBackPressed() {
-
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
-        }
-    }
-
-    public class AndroidBridge {
-
-        @JavascriptInterface
-        public void scheduleReminder(String time) {
-
-            if (time == null || !time.matches("\\d{2}:\\d{2}")) {
-                return;
-            }
-
-            try {
-                String[] parts = time.split(":");
-
-                int hour =
-                        Integer.parseInt(parts[0]);
-
-                int minute =
-                        Integer.parseInt(parts[1]);
-
-                scheduleReminder(hour, minute);
-
-            } catch (Exception ignored) {
-            }
-        }
-
-        @JavascriptInterface
-        public void scheduleReminder(int hour, int minute) {
-            MainActivity.this.scheduleReminder(hour, minute);
-        }
-
-        @JavascriptInterface
-        public void tefillinDone() {
-            markDoneToday();
-        }
-
-        @JavascriptInterface
-        public void markTefillinDone() {
-            markDoneToday();
-        }
-
-        @JavascriptInterface
-        public void stopAlarm() {
-            stopAlarmSound();
-        }
-
-        @JavascriptInterface
-        public void remindInTenMinutes() {
-            scheduleTenMinutes();
-        }
-
-        @JavascriptInterface
-        public boolean isTefillinDoneToday() {
-            return isDoneToday();
-        }
-
-        @JavascriptInterface
-        public void openOverlayPermission() {
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                    !Settings.canDrawOverlays(MainActivity.this)) {
-
-                Intent intent =
-                        new Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse(
-                                        "package:" +
-                                                getPackageName()
-                                )
-                        );
-
-                startActivity(intent);
-            }
         }
     }
 }
