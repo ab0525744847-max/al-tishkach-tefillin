@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -22,6 +23,7 @@ import java.util.Calendar;
 public class MainActivity extends Activity {
 
     private WebView webView;
+
     private static final String WEBSITE =
             "https://mildly-puck-wcst1.shipped.cloud/";
 
@@ -29,6 +31,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
 
         requestNotificationPermission();
@@ -58,6 +61,7 @@ public class MainActivity extends Activity {
     }
 
     private void requestNotificationPermission() {
+
         if (Build.VERSION.SDK_INT >= 33 &&
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                         != PackageManager.PERMISSION_GRANTED) {
@@ -70,15 +74,23 @@ public class MainActivity extends Activity {
     }
 
     private void requestExactAlarmPermission() {
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+
             AlarmManager alarmManager =
                     (AlarmManager) getSystemService(ALARM_SERVICE);
 
             if (!alarmManager.canScheduleExactAlarms()) {
+
                 try {
+
                     Intent intent =
-                            new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                            new Intent(
+                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                            );
+
                     startActivity(intent);
+
                 } catch (Exception ignored) {
                 }
             }
@@ -89,7 +101,9 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void scheduleReminder(String time) {
+
             try {
+
                 String[] parts = time.split(":");
 
                 int hour = Integer.parseInt(parts[0]);
@@ -98,6 +112,7 @@ public class MainActivity extends Activity {
                 scheduleAlarm(hour, minute);
 
             } catch (Exception e) {
+
                 runOnUiThread(() ->
                         Toast.makeText(
                                 MainActivity.this,
@@ -107,23 +122,88 @@ public class MainActivity extends Activity {
                 );
             }
         }
+
+        @JavascriptInterface
+        public void tefillinDone() {
+
+            stopAlarmNow();
+
+        }
     }
 
-    private void scheduleAlarm(int hour, int minute) {
+    private void stopAlarmNow() {
 
-        Calendar calendar = Calendar.getInstance();
+        Intent stopIntent =
+                new Intent(
+                        this,
+                        ReminderReceiver.class
+                );
 
-        calendar.set(Calendar.HOUR_OF_DAY, hour);
-        calendar.set(Calendar.MINUTE, minute);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
+        stopIntent.setAction("STOP_ALARM");
 
-        if (calendar.getTimeInMillis() <= System.currentTimeMillis()) {
-            calendar.add(Calendar.DAY_OF_YEAR, 1);
+        sendBroadcast(stopIntent);
+
+        NotificationManager manager =
+                (NotificationManager)
+                        getSystemService(
+                                Context.NOTIFICATION_SERVICE
+                        );
+
+        if (manager != null) {
+            manager.cancel(1001);
+        }
+
+        runOnUiThread(() ->
+                Toast.makeText(
+                        MainActivity.this,
+                        "הצלצול הופסק ✓",
+                        Toast.LENGTH_SHORT
+                ).show()
+        );
+    }
+
+    private void scheduleAlarm(
+            int hour,
+            int minute
+    ) {
+
+        Calendar calendar =
+                Calendar.getInstance();
+
+        calendar.set(
+                Calendar.HOUR_OF_DAY,
+                hour
+        );
+
+        calendar.set(
+                Calendar.MINUTE,
+                minute
+        );
+
+        calendar.set(
+                Calendar.SECOND,
+                0
+        );
+
+        calendar.set(
+                Calendar.MILLISECOND,
+                0
+        );
+
+        if (calendar.getTimeInMillis()
+                <= System.currentTimeMillis()) {
+
+            calendar.add(
+                    Calendar.DAY_OF_YEAR,
+                    1
+            );
         }
 
         Intent intent =
-                new Intent(this, ReminderReceiver.class);
+                new Intent(
+                        this,
+                        ReminderReceiver.class
+                );
 
         PendingIntent pendingIntent =
                 PendingIntent.getBroadcast(
@@ -135,10 +215,14 @@ public class MainActivity extends Activity {
                 );
 
         AlarmManager alarmManager =
-                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                (AlarmManager)
+                        getSystemService(
+                                Context.ALARM_SERVICE
+                        );
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                alarmManager.canScheduleExactAlarms()) {
+        if (Build.VERSION.SDK_INT
+                >= Build.VERSION_CODES.S
+                && alarmManager.canScheduleExactAlarms()) {
 
             alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -146,7 +230,10 @@ public class MainActivity extends Activity {
                     pendingIntent
             );
 
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        } else if (
+                Build.VERSION.SDK_INT
+                        >= Build.VERSION_CODES.M
+        ) {
 
             alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -163,7 +250,10 @@ public class MainActivity extends Activity {
             );
         }
 
-        getSharedPreferences("reminder", MODE_PRIVATE)
+        getSharedPreferences(
+                "reminder",
+                MODE_PRIVATE
+        )
                 .edit()
                 .putInt("hour", hour)
                 .putInt("minute", minute)
@@ -173,12 +263,15 @@ public class MainActivity extends Activity {
         runOnUiThread(() ->
                 Toast.makeText(
                         MainActivity.this,
+
                         String.format(
                                 "🔔 התזכורת נקבעה ל־%02d:%02d",
                                 hour,
                                 minute
                         ),
+
                         Toast.LENGTH_LONG
+
                 ).show()
         );
     }
@@ -186,50 +279,245 @@ public class MainActivity extends Activity {
     private void connectWebsiteToAndroid() {
 
         String javascript =
+
                 "(function() {" +
-                " if (window.__androidReminderConnected) return;" +
-                " window.__androidReminderConnected = true;" +
 
-                " function findTime() {" +
-                "   var inputs = document.querySelectorAll('input[type=\"time\"]');" +
-                "   for (var i = 0; i < inputs.length; i++) {" +
-                "     if (inputs[i].value) return inputs[i].value;" +
-                "   }" +
-                "   return null;" +
-                " }" +
+                "if (window.__androidReminderConnected) return;" +
+                "window.__androidReminderConnected = true;" +
 
-                " function sendReminder() {" +
-                "   var t = findTime();" +
-                "   if (t && window.AndroidReminder) {" +
-                "     AndroidReminder.scheduleReminder(t);" +
-                "   }" +
-                " }" +
+                /*
+                 * מציאת השעה שנבחרה
+                 */
+                "function findTime() {" +
 
-                " document.addEventListener('click', function(e) {" +
-                "   var el = e.target;" +
-                "   var text = (el.innerText || el.textContent || '').trim();" +
-                "   if (/שמור|קבע|הפעל|תזכורת/.test(text)) {" +
-                "     setTimeout(sendReminder, 400);" +
-                "   }" +
-                " }, true);" +
+                "var inputs = document.querySelectorAll(" +
+                "'input[type=\"time\"]');" +
 
-                " document.addEventListener('change', function(e) {" +
-                "   if (e.target && e.target.type === 'time') {" +
-                "     setTimeout(sendReminder, 300);" +
-                "   }" +
-                " }, true);" +
+                "for (var i = 0; i < inputs.length; i++) {" +
+
+                "if (inputs[i].value) {" +
+                "return inputs[i].value;" +
+                "}" +
+
+                "}" +
+
+                "return null;" +
+
+                "}" +
+
+                /*
+                 * שליחת התזכורת לאנדרואיד
+                 */
+                "function sendReminder() {" +
+
+                "var t = findTime();" +
+
+                "if (t && window.AndroidReminder) {" +
+
+                "AndroidReminder.scheduleReminder(t);" +
+
+                "}" +
+
+                "}" +
+
+                /*
+                 * מגביל את השעות
+                 * זריחה -> 10 דקות לפני שקיעה
+                 */
+                "function limitReminderTime() {" +
+
+                "var bodyText = document.body.innerText || '';" +
+
+                "var sunriseMatch = " +
+                "bodyText.match(/זריחה[^0-9]{0,30}([0-2]?[0-9]:[0-5][0-9])/);" +
+
+                "var sunsetMatch = " +
+                "bodyText.match(/שקיעה[^0-9]{0,30}([0-2]?[0-9]:[0-5][0-9])/);" +
+
+                "var minTime = null;" +
+                "var maxTime = null;" +
+
+                "if (sunriseMatch) {" +
+
+                "minTime = sunriseMatch[1];" +
+
+                "if (minTime.length === 4) {" +
+                "minTime = '0' + minTime;" +
+                "}" +
+
+                "}" +
+
+                "if (sunsetMatch) {" +
+
+                "var parts = sunsetMatch[1].split(':');" +
+
+                "var totalMinutes = " +
+                "parseInt(parts[0], 10) * 60 +" +
+                "parseInt(parts[1], 10) - 10;" +
+
+                "if (totalMinutes >= 0) {" +
+
+                "var h = Math.floor(totalMinutes / 60);" +
+                "var m = totalMinutes % 60;" +
+
+                "maxTime =" +
+                "('0' + h).slice(-2) +" +
+                "':' +" +
+                "('0' + m).slice(-2);" +
+
+                "}" +
+
+                "}" +
+
+                "var inputs = document.querySelectorAll(" +
+                "'input[type=\"time\"]');" +
+
+                "for (var i = 0; i < inputs.length; i++) {" +
+
+                "if (minTime) {" +
+                "inputs[i].min = minTime;" +
+                "}" +
+
+                "if (maxTime) {" +
+                "inputs[i].max = maxTime;" +
+                "}" +
+
+                "}" +
+
+                "}" +
+
+                /*
+                 * לחיצה על כפתורים באתר
+                 */
+                "document.addEventListener(" +
+                "'click'," +
+
+                "function(e) {" +
+
+                "var el = e.target;" +
+                "var current = el;" +
+                "var text = '';" +
+
+                /*
+                 * בודק גם את האלמנט
+                 * וגם כמה הורים שלו
+                 */
+                "for (var i = 0; i < 4 && current; i++) {" +
+
+                "text += ' ' +" +
+                "((current.innerText || " +
+                "current.textContent || '')" +
+                ".trim());" +
+
+                "current = current.parentElement;" +
+
+                "}" +
+
+                /*
+                 * הנחתי תפילין
+                 */
+                "if (" +
+                "/הנחתי\\s*תפילין|כבר\\s*הנחתי|הנחתי/" +
+                ".test(text)" +
+                ") {" +
+
+                "if (window.AndroidReminder) {" +
+
+                "AndroidReminder.tefillinDone();" +
+
+                "}" +
+
+                "return;" +
+
+                "}" +
+
+                /*
+                 * שמירת תזכורת
+                 */
+                "var buttonText =" +
+                "((el.innerText || " +
+                "el.textContent || '')" +
+                ".trim());" +
+
+                "if (" +
+                "/שמור|קבע|הפעל|תזכורת/" +
+                ".test(buttonText)" +
+                ") {" +
+
+                "setTimeout(" +
+                "sendReminder," +
+                "400" +
+                ");" +
+
+                "}" +
+
+                "}," +
+                "true" +
+
+                ");" +
+
+                /*
+                 * שינוי שעה
+                 */
+                "document.addEventListener(" +
+                "'change'," +
+
+                "function(e) {" +
+
+                "if (" +
+                "e.target && " +
+                "e.target.type === 'time'" +
+                ") {" +
+
+                "setTimeout(" +
+                "sendReminder," +
+                "300" +
+                ");" +
+
+                "}" +
+
+                "}," +
+                "true" +
+
+                ");" +
+
+                /*
+                 * הפעלת הגבלת השעות
+                 */
+                "limitReminderTime();" +
+
+                "setTimeout(" +
+                "limitReminderTime," +
+                "1000" +
+                ");" +
+
+                "setTimeout(" +
+                "limitReminderTime," +
+                "3000" +
+                ");" +
 
                 "})();";
 
-        webView.evaluateJavascript(javascript, null);
+        webView.evaluateJavascript(
+                javascript,
+                null
+        );
     }
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
+
+        if (
+                webView != null &&
+                webView.canGoBack()
+        ) {
+
             webView.goBack();
+
         } else {
+
             finish();
+
         }
     }
 }
