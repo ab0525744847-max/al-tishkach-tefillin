@@ -2,31 +2,28 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- אינטרנט -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- התראות -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- שעון מעורר מדויק -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- הפעלה מחדש אחרי כיבוי/הדלקה -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- רטט -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- הצגה מעל אפליקציות אחרות -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
 
     <application
         android:allowBackup="true"
         android:label="אל תשכח תפילין"
+        android:icon="@drawable/app_icon"
+        android:roundIcon="@drawable/app_icon"
         android:theme="@style/Theme.AlTishkachTefillin"
         android:usesCleartextTraffic="false">
 
-        <!-- האפליקציה הראשית -->
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -43,7 +40,6 @@
         </activity>
 
 
-        <!-- מסך הצלצול הגדול -->
         <activity
             android:name=".AlarmActivity"
             android:exported="false"
@@ -52,13 +48,11 @@
             android:turnScreenOn="true" />
 
 
-        <!-- מקבל את התזכורת -->
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
 
 
-        <!-- מחזיר תזכורות לאחר הפעלת הטלפון -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -71,6 +65,7 @@
             </intent-filter>
 
         </receiver>
+
 
     </application>
 
