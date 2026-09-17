@@ -11,33 +11,36 @@
     <!-- רטט -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- שעון מעורר מדויק -->
+    <!-- תזכורות ושעונים מדויקים -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- הפעלה מחדש של התזכורת אחרי אתחול הטלפון -->
+    <!-- הפעלת התזכורות מחדש לאחר הפעלת הטלפון -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- מסך התראה מלא -->
+    <!-- אפשרות להציג התראת שעון מעורר במסך מלא -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- הצגה מעל אפליקציות אחרות -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- הפעלת שירות בחזית לצלצול ממושך -->
+    <!-- שירות בחזית -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- נדרש לשירות שמנגן את צלצול האזעקה -->
+    <!-- שירות בחזית עבור השמעת צלצול -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <!-- שמירת המעבד ער בזמן שהאזעקה פועלת -->
+    <!-- שמירת המכשיר ער בזמן האזעקה -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/app_icon"
+        android:roundIcon="@drawable/app_icon"
         android:label="אל תשכח תפילין"
         android:supportsRtl="true"
         android:theme="@style/Theme.AlTishkachTefillin">
 
+        <!-- האפליקציה הראשית -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -49,6 +52,7 @@
 
         </activity>
 
+        <!-- מסך השעון המעורר -->
         <activity
             android:name=".AlarmActivity"
             android:exported="false"
@@ -57,10 +61,12 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
+        <!-- קבלת התזכורת -->
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
 
+        <!-- שחזור התזכורת לאחר הפעלה מחדש -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
