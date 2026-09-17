@@ -5,31 +5,21 @@ import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.net.Uri;
 import android.os.Build;
-import android.provider.Settings;
 
 import androidx.core.app.NotificationCompat;
 
 public class ReminderReceiver extends BroadcastReceiver {
 
-    private static final String CHANNEL_ID = "tefillin_alarm";
+    private static final String CHANNEL_ID = "tefillin_reminders";
 
     @Override
     public void onReceive(Context context, Intent intent) {
 
-        NotificationManager manager =
+        NotificationManager notificationManager =
                 (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
-        Uri alarmSound = Settings.System.DEFAULT_ALARM_ALERT_URI;
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioAttributes audioAttributes =
-                    new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .build();
-
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
                     "תזכורת תפילין",
@@ -37,17 +27,17 @@ public class ReminderReceiver extends BroadcastReceiver {
             );
 
             channel.setDescription("תזכורת להנחת תפילין");
-            channel.enableVibration(true);
-            channel.setSound(alarmSound, audioAttributes);
-
-            manager.createNotificationChannel(channel);
+            notificationManager.createNotificationChannel(channel);
         }
 
         NotificationCompat.Builder builder =
                 new NotificationCompat.Builder(context, CHANNEL_ID)
-                        .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                        .setSmallIcon(R.drawable.ic_notification)
                         .setContentTitle("אל תשכח תפילין")
-                        .setContentText("הגיע הזמן להניח תפילין 🙏")
-                        .setPriority(NotificationCompat.PRIORITY_MAX)
-                        .setCategory(NotificationCompat.CATEGORY_ALARM)
-                        .setSound
+                        .setContentText("זה הזמן להניח תפילין 🙏")
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setAutoCancel(true);
+
+        notificationManager.notify(1001, builder.build());
+    }
+}
