@@ -2,47 +2,47 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- אינטרנט בשביל האתר -->
+    <!-- האתר בתוך האפליקציה -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- התראות -->
+    <!-- התראות באנדרואיד 13 ומעלה -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- רטט בזמן התזכורת -->
+    <!-- רטט בזמן הצלצול -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- תזכורות מדויקות -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- הפעלה מחדש של התזכורת אחרי הדלקת הטלפון -->
+    <!-- שחזור תזכורת לאחר הפעלת הטלפון -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- הצגת מסך התזכורת במסך הנעילה -->
+    <!-- אפשרות למסך התראה מלא -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
-    <!-- הצגה מעל אפליקציות אחרות -->
+    <!-- אפשרות להצגה מעל אפליקציות אחרות -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/app_icon"
         android:label="אל תשכח תפילין"
         android:supportsRtl="true"
         android:theme="@style/Theme.AlTishkachTefillin">
 
+        <!-- האפליקציה הראשית -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
 
             <intent-filter>
-
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
-
             </intent-filter>
 
         </activity>
 
+        <!-- מסך הצלצול -->
         <activity
             android:name=".AlarmActivity"
             android:exported="false"
@@ -51,23 +51,23 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
+        <!-- מקבל את התזכורת בזמן שנקבע -->
         <receiver
             android:name=".ReminderReceiver"
+            android:enabled="true"
             android:exported="false" />
 
+        <!-- מחזיר את התזכורת לאחר הפעלת הטלפון -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:directBootAware="true">
 
             <intent-filter>
-
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-
             </intent-filter>
 
         </receiver>
