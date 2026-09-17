@@ -39,32 +39,70 @@ public class MainActivity extends Activity {
     private static final String WEBSITE_URL =
             "https://mildly-puck-wcst1.shipped.cloud/";
 
-    private static final String PREFS = "tefillin_prefs";
-    private static final String KEY_RINGTONE = "ringtone_uri";
+    private static final String PREFS =
+            "tefillin_prefs";
 
-    private static final int NOTIFICATION_PERMISSION_REQUEST = 100;
-    private static final int ALARM_REQUEST_CODE = 5001;
+    private static final String KEY_RINGTONE =
+            "ringtone_uri";
+
+    private static final String KEY_ALARM_TIME =
+            "alarm_time";
+
+    private static final String KEY_ALARM_ACTIVE =
+            "alarm_active";
+
+    private static final String KEY_DONE =
+            "tefillin_done";
+
+    private static final String KEY_DONE_DATE =
+            "tefillin_done_date";
+
+    private static final String KEY_OVERLAY_ASKED =
+            "overlay_permission_asked";
+
+    private static final int NOTIFICATION_PERMISSION_REQUEST =
+            100;
+
+    private static final int ALARM_REQUEST_CODE =
+            5001;
 
     private WebView webView;
     private FrameLayout rootLayout;
 
-    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
+    private Ringtone previewRingtone;
+
+    @SuppressLint({
+            "SetJavaScriptEnabled",
+            "JavascriptInterface"
+    })
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         createScreen();
         configureWebView();
+
         askNotificationPermission();
 
         webView.loadUrl(WEBSITE_URL);
+
+        /*
+         * נותנים למסך הראשי להיפתח קודם,
+         * ואז בודקים את הרשאת ההצגה מעל אפליקציות.
+         */
+        webView.postDelayed(
+                this::checkOverlayPermission,
+                1000
+        );
     }
 
     private void createScreen() {
 
-        rootLayout = new FrameLayout(this);
+        rootLayout =
+                new FrameLayout(this);
 
-        webView = new WebView(this);
+        webView =
+                new WebView(this);
 
         FrameLayout.LayoutParams webParams =
                 new FrameLayout.LayoutParams(
@@ -72,14 +110,35 @@ public class MainActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT
                 );
 
-        rootLayout.addView(webView, webParams);
+        rootLayout.addView(
+                webView,
+                webParams
+        );
 
-        Button ringtoneButton = new Button(this);
+        /*
+         * כפתור בחירת הצלצול.
+         * הוא נשאר מעל האתר כדי שאפשר יהיה
+         * לבחור צלצול גם בלי לשנות את קוד האתר.
+         */
+        Button ringtoneButton =
+                new Button(this);
 
-        ringtoneButton.setText("🔔 צלצול");
+        ringtoneButton.setText(
+                "🔔 צלצול"
+        );
+
         ringtoneButton.setTextSize(14);
+
         ringtoneButton.setAllCaps(false);
-        ringtoneButton.setTextColor(Color.rgb(15, 25, 50));
+
+        ringtoneButton.setTextColor(
+                Color.rgb(
+                        15,
+                        25,
+                        50
+                )
+        );
+
         ringtoneButton.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
@@ -92,7 +151,8 @@ public class MainActivity extends Activity {
                 );
 
         buttonParams.gravity =
-                Gravity.BOTTOM | Gravity.END;
+                Gravity.BOTTOM |
+                        Gravity.END;
 
         buttonParams.setMargins(
                 25,
@@ -101,31 +161,61 @@ public class MainActivity extends Activity {
                 45
         );
 
-        ringtoneButton.setLayoutParams(buttonParams);
+        ringtoneButton.setLayoutParams(
+                buttonParams
+        );
 
         ringtoneButton.setOnClickListener(
                 v -> showRingtoneChooser()
         );
 
-        rootLayout.addView(ringtoneButton);
+        rootLayout.addView(
+                ringtoneButton
+        );
 
-        setContentView(rootLayout);
+        setContentView(
+                rootLayout
+        );
     }
 
-    @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
+    @SuppressLint({
+            "SetJavaScriptEnabled",
+            "JavascriptInterface"
+    })
     private void configureWebView() {
 
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setDomStorageEnabled(true);
-        webView.getSettings().setDatabaseEnabled(true);
-        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        webView.getSettings()
+                .setJavaScriptEnabled(true);
 
-        webView.setWebViewClient(
-                new WebViewClient()
-        );
+        webView.getSettings()
+                .setDomStorageEnabled(true);
+
+        webView.getSettings()
+                .setDatabaseEnabled(true);
+
+        webView.getSettings()
+                .setMediaPlaybackRequiresUserGesture(false);
 
         webView.setWebChromeClient(
                 new WebChromeClient()
+        );
+
+        webView.setWebViewClient(
+                new WebViewClient() {
+
+                    @Override
+                    public void onPageFinished(
+                            WebView view,
+                            String url
+                    ) {
+                        super.onPageFinished(
+                                view,
+                                url
+                        );
+
+                        notifyWebsiteAppReady();
+                    }
+                }
         );
 
         webView.addJavascriptInterface(
@@ -134,6 +224,9 @@ public class MainActivity extends Activity {
         );
     }
 
+    /*
+     * הרשאת התראות Android 13+
+     */
     private void askNotificationPermission() {
 
         if (Build.VERSION.SDK_INT >=
@@ -153,6 +246,132 @@ public class MainActivity extends Activity {
         }
     }
 
+    /*
+     * הרשאת "הצגה מעל אפליקציות אחרות".
+     *
+     * Android לא מאפשר לאפליקציה לאשר אותה בעצמה.
+     * המשתמש חייב להפעיל אותה במסך ההגדרות.
+     */
+    private void checkOverlayPermission() {
+
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.M) {
+            return;
+        }
+
+        if (Settings.canDrawOverlays(this)) {
+            return;
+        }
+
+        SharedPreferences prefs =
+                getSharedPreferences(
+                        PREFS,
+                        MODE_PRIVATE
+                );
+
+        boolean alreadyAsked =
+                prefs.getBoolean(
+                        KEY_OVERLAY_ASKED,
+                        false
+                );
+
+        /*
+         * בפעם הראשונה מציגים הסבר.
+         * לאחר מכן המשתמש עדיין יכול לפתוח
+         * את ההרשאה דרך Android Bridge.
+         */
+        if (!alreadyAsked) {
+
+            new AlertDialog.Builder(this)
+                    .setTitle(
+                            "הרשאה לתזכורת"
+                    )
+                    .setMessage(
+                            "כדי שמסך התזכורת יוכל להופיע מעל אפליקציות אחרות, צריך לאפשר לאפליקציה \"הצגה מעל אפליקציות אחרות\"."
+                    )
+                    .setPositiveButton(
+                            "פתח הגדרות",
+                            (dialog, which) -> {
+
+                                prefs.edit()
+                                        .putBoolean(
+                                                KEY_OVERLAY_ASKED,
+                                                true
+                                        )
+                                        .apply();
+
+                                openOverlaySettings();
+                            }
+                    )
+                    .setNegativeButton(
+                            "לא עכשיו",
+                            (dialog, which) -> {
+
+                                prefs.edit()
+                                        .putBoolean(
+                                                KEY_OVERLAY_ASKED,
+                                                true
+                                        )
+                                        .apply();
+                            }
+                    )
+                    .setCancelable(false)
+                    .show();
+        }
+    }
+
+    private void openOverlaySettings() {
+
+        if (Build.VERSION.SDK_INT <
+                Build.VERSION_CODES.M) {
+            return;
+        }
+
+        try {
+
+            Intent intent =
+                    new Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+                    );
+
+            intent.setData(
+                    Uri.parse(
+                            "package:" +
+                                    getPackageName()
+                    )
+            );
+
+            startActivity(intent);
+
+        } catch (Exception firstError) {
+
+            /*
+             * גיבוי למכשירים שבהם היצרן
+             * שינה את מסך ההרשאות.
+             */
+            try {
+
+                Intent intent =
+                        new Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+                        );
+
+                startActivity(intent);
+
+            } catch (Exception secondError) {
+
+                Toast.makeText(
+                        this,
+                        "פתח בהגדרות את ההרשאה: הצגה מעל אפליקציות אחרות",
+                        Toast.LENGTH_LONG
+                ).show();
+            }
+        }
+    }
+
+    /*
+     * הרשאת תזכורות מדויקות Android 12+
+     */
     private void requestExactAlarmPermissionIfNeeded() {
 
         if (Build.VERSION.SDK_INT >=
@@ -210,6 +429,9 @@ public class MainActivity extends Activity {
         );
     }
 
+    /*
+     * קביעת תזכורת.
+     */
     private void scheduleAlarm(
             long triggerAtMillis
     ) {
@@ -244,6 +466,13 @@ public class MainActivity extends Activity {
                         );
 
         if (alarmManager == null) {
+
+            Toast.makeText(
+                    this,
+                    "לא ניתן להפעיל את התזכורת",
+                    Toast.LENGTH_LONG
+            ).show();
+
             return;
         }
 
@@ -257,7 +486,7 @@ public class MainActivity extends Activity {
 
                 Toast.makeText(
                         this,
-                        "צריך לאפשר תזכורות מדויקות",
+                        "צריך לאפשר לאפליקציה תזכורות מדויקות",
                         Toast.LENGTH_LONG
                 ).show();
 
@@ -276,11 +505,11 @@ public class MainActivity extends Activity {
             )
                     .edit()
                     .putLong(
-                            "alarm_time",
+                            KEY_ALARM_TIME,
                             triggerAtMillis
                     )
                     .putBoolean(
-                            "alarm_active",
+                            KEY_ALARM_ACTIVE,
                             true
                     )
                     .apply();
@@ -291,12 +520,28 @@ public class MainActivity extends Activity {
                     Toast.LENGTH_SHORT
             ).show();
 
+            notifyWebsiteReminderChanged(
+                    triggerAtMillis,
+                    true
+            );
+
         } catch (SecurityException e) {
 
             requestExactAlarmPermissionIfNeeded();
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "אירעה בעיה בשמירת התזכורת",
+                    Toast.LENGTH_LONG
+            ).show();
         }
     }
 
+    /*
+     * ביטול תזכורת.
+     */
     private void cancelAlarm() {
 
         AlarmManager alarmManager =
@@ -307,9 +552,14 @@ public class MainActivity extends Activity {
 
         if (alarmManager != null) {
 
-            alarmManager.cancel(
-                    getReminderPendingIntent()
-            );
+            try {
+
+                alarmManager.cancel(
+                        getReminderPendingIntent()
+                );
+
+            } catch (Exception ignored) {
+            }
         }
 
         getSharedPreferences(
@@ -318,16 +568,28 @@ public class MainActivity extends Activity {
         )
                 .edit()
                 .putBoolean(
-                        "alarm_active",
+                        KEY_ALARM_ACTIVE,
                         false
                 )
                 .remove(
-                        "alarm_time"
+                        KEY_ALARM_TIME
                 )
                 .apply();
+
+        notifyWebsiteReminderChanged(
+                0,
+                false
+        );
     }
 
+    /*
+     * בחירת עד 10 צלצולי Alarm מהמכשיר.
+     */
     private void showRingtoneChooser() {
+
+        stopPreviewRingtone();
+
+        Cursor cursor = null;
 
         try {
 
@@ -338,7 +600,7 @@ public class MainActivity extends Activity {
                     RingtoneManager.TYPE_ALARM
             );
 
-            Cursor cursor =
+            cursor =
                     manager.getCursor();
 
             ArrayList<String> names =
@@ -376,7 +638,9 @@ public class MainActivity extends Activity {
                     if (ringtone != null) {
 
                         String phoneTitle =
-                                ringtone.getTitle(this);
+                                ringtone.getTitle(
+                                        this
+                                );
 
                         if (phoneTitle != null &&
                                 !phoneTitle.trim().isEmpty()) {
@@ -399,8 +663,6 @@ public class MainActivity extends Activity {
 
                 count++;
             }
-
-            cursor.close();
 
             if (names.isEmpty()) {
 
@@ -426,6 +688,11 @@ public class MainActivity extends Activity {
                             options,
                             (dialog, which) -> {
 
+                                if (which < 0 ||
+                                        which >= uris.size()) {
+                                    return;
+                                }
+
                                 String selected =
                                         uris.get(which);
 
@@ -449,6 +716,8 @@ public class MainActivity extends Activity {
                                         "הצלצול נשמר ✓",
                                         Toast.LENGTH_SHORT
                                 ).show();
+
+                                notifyWebsiteRingtoneChanged();
                             }
                     )
                     .setNegativeButton(
@@ -464,12 +733,27 @@ public class MainActivity extends Activity {
                     "לא ניתן לפתוח את רשימת הצלצולים",
                     Toast.LENGTH_LONG
             ).show();
+
+        } finally {
+
+            if (cursor != null) {
+
+                try {
+                    cursor.close();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
+    /*
+     * השמעת דוגמה של הצלצול למשך 3 שניות.
+     */
     private void previewRingtone(
             String uriString
     ) {
+
+        stopPreviewRingtone();
 
         try {
 
@@ -478,199 +762,7 @@ public class MainActivity extends Activity {
                             uriString
                     );
 
-            Ringtone ringtone =
+            previewRingtone =
                     RingtoneManager.getRingtone(
                             this,
-                            uri
-                    );
-
-            if (ringtone == null) {
-                return;
-            }
-
-            ringtone.play();
-
-            webView.postDelayed(
-                    () -> {
-
-                        try {
-
-                            if (ringtone.isPlaying()) {
-                                ringtone.stop();
-                            }
-
-                        } catch (Exception ignored) {
-                        }
-
-                    },
-                    3000
-            );
-
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void markTefillinDone() {
-
-        String today =
-                getTodayKey();
-
-        cancelAlarm();
-
-        getSharedPreferences(
-                PREFS,
-                MODE_PRIVATE
-        )
-                .edit()
-                .putBoolean(
-                        "tefillin_done",
-                        true
-                )
-                .putString(
-                        "tefillin_done_date",
-                        today
-                )
-                .putBoolean(
-                        "alarm_active",
-                        false
-                )
-                .remove(
-                        "alarm_time"
-                )
-                .apply();
-
-        runOnUiThread(
-                () -> {
-
-                    if (webView != null) {
-
-                        webView.evaluateJavascript(
-                                "window.dispatchEvent(new CustomEvent('tefillinDone'));",
-                                null
-                        );
-                    }
-                }
-        );
-    }
-
-    private boolean isTefillinDoneToday() {
-
-        SharedPreferences prefs =
-                getSharedPreferences(
-                        PREFS,
-                        MODE_PRIVATE
-                );
-
-        String savedDate =
-                prefs.getString(
-                        "tefillin_done_date",
-                        ""
-                );
-
-        return getTodayKey()
-                .equals(savedDate);
-    }
-
-    private String getTodayKey() {
-
-        return new SimpleDateFormat(
-                "yyyy-MM-dd",
-                Locale.US
-        ).format(
-                new Date()
-        );
-    }
-
-    public class AndroidBridge {
-
-        @JavascriptInterface
-        public void scheduleReminder(
-                long timestamp
-        ) {
-
-            runOnUiThread(
-                    () -> scheduleAlarm(
-                            timestamp
-                    )
-            );
-        }
-
-        @JavascriptInterface
-        public void setReminder(
-                long timestamp
-        ) {
-
-            scheduleReminder(
-                    timestamp
-            );
-        }
-
-        @JavascriptInterface
-        public void cancelReminder() {
-
-            runOnUiThread(
-                    MainActivity.this::cancelAlarm
-            );
-        }
-
-        @JavascriptInterface
-        public void chooseRingtone() {
-
-            runOnUiThread(
-                    MainActivity.this::showRingtoneChooser
-            );
-        }
-
-        @JavascriptInterface
-        public String getSelectedRingtone() {
-
-            return getSharedPreferences(
-                    PREFS,
-                    MODE_PRIVATE
-            ).getString(
-                    KEY_RINGTONE,
-                    ""
-            );
-        }
-
-        @JavascriptInterface
-        public void markTefillinDone() {
-
-            MainActivity.this
-                    .markTefillinDone();
-        }
-
-        @JavascriptInterface
-        public boolean isTefillinDone() {
-
-            return isTefillinDoneToday();
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-
-        if (webView != null) {
-
-            webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('androidAppResumed'));",
-                    null
-            );
-        }
-    }
-
-    @Override
-    public void onBackPressed() {
-
-        if (webView != null &&
-                webView.canGoBack()) {
-
-            webView.goBack();
-
-        } else {
-
-            super.onBackPressed();
-        }
-    }
-}
+                  
