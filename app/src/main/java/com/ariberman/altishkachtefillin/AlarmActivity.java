@@ -2,11 +2,15 @@ package com.ariberman.altishkachtefillin;
 
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.media.AudioAttributes;
-import android.media.Ringtone;
+import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -14,69 +18,84 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.view.Gravity;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import java.util.Calendar;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class AlarmActivity extends Activity {
 
-    private Ringtone ringtone;
+    private MediaPlayer mediaPlayer;
     private Vibrator vibrator;
-    private boolean actionDone = false;
+
+    private SharedPreferences prefs;
+
+    private static final int NOTIFICATION_ID = 1001;
+    private static final int ALARM_REQUEST_CODE = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // הצגת מסך הצלצול גם כשהטלפון נעול
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true);
-            setTurnScreenOn(true);
-        } else {
-            getWindow().addFlags(
-                    WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            );
-        }
+        showOverLockScreen();
 
-        getWindow().addFlags(
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
-                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+        prefs = getSharedPreferences(
+                "tefillin_reminder",
+                Context.MODE_PRIVATE
         );
 
-        createScreen();
+        buildScreen();
         startAlarm();
     }
 
-    private void createScreen() {
+    private void showOverLockScreen() {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        }
+
+        Window window = getWindow();
+
+        window.addFlags(
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+                WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
+        );
+    }
+
+    private void buildScreen() {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
-        root.setPadding(50, 50, 50, 50);
-        root.setBackgroundColor(0xFF06122D);
+        root.setPadding(50, 70, 50, 70);
+        root.setBackgroundColor(Color.rgb(3, 16, 43));
 
         TextView title = new TextView(this);
-        title.setText("⏰ אל תשכח תפילין");
-        title.setTextSize(32);
-        title.setTextColor(0xFFFFD65A);
+        title.setText("אל תשכח תפילין");
+        title.setTextColor(Color.rgb(255, 218, 105));
+        title.setTextSize(34);
+        title.setTypeface(null, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
 
         TextView message = new TextView(this);
         message.setText("\nהגיע הזמן להניח תפילין\n");
+        message.setTextColor(Color.WHITE);
         message.setTextSize(22);
-        message.setTextColor(0xFFFFFFFF);
         message.setGravity(Gravity.CENTER);
 
         Button doneButton = new Button(this);
-        doneButton.setText("הנחתי תפילין ✓");
+        doneButton.setText("✓ הנחתי תפילין");
         doneButton.setTextSize(20);
 
         Button snoozeButton = new Button(this);
-        snoozeButton.setText("עוד 10 דקות");
+        snoozeButton.setText("⏰ עוד 10 דקות");
         snoozeButton.setTextSize(20);
 
         LinearLayout.LayoutParams buttonParams =
@@ -94,189 +113,238 @@ public class AlarmActivity extends Activity {
 
         setContentView(root);
 
-        // המשתמש הניח תפילין
-        doneButton.setOnClickListener(v -> {
+        doneButton.setOnClickListener(v -> markAsDone());
 
-            if (actionDone) return;
-            actionDone = true;
-
-            stopAlarm();
-
-            getSharedPreferences("tefillin", MODE_PRIVATE)
-                    .edit()
-                    .putBoolean("done_today", true)
-                    .putLong("done_time", System.currentTimeMillis())
-                    .apply();
-
-            // מודיע למסך הראשי שהמשתמש הניח
-            Intent updateIntent =
-                    new Intent("com.ariberman.altishkachtefillin.TEFILLIN_DONE");
-            updateIntent.setPackage(getPackageName());
-            sendBroadcast(updateIntent);
-
-            finishAndRemoveTask();
-        });
-
-        // דחייה של 10 דקות
-        snoozeButton.setOnClickListener(v -> {
-
-            if (actionDone) return;
-
-            boolean alreadyDone =
-                    getSharedPreferences("tefillin", MODE_PRIVATE)
-                            .getBoolean("done_today", false);
-
-            // אם כבר סימן שהניח - אי אפשר לדחות
-            if (alreadyDone) {
-                snoozeButton.setEnabled(false);
-                snoozeButton.setText("כבר סימנת שהנחת ✓");
-                return;
-            }
-
-            actionDone = true;
-
-            stopAlarm();
-            scheduleTenMinutes();
-
-            getSharedPreferences("tefillin", MODE_PRIVATE)
-                    .edit()
-                    .putLong(
-                            "snooze_until",
-                            System.currentTimeMillis() + (10 * 60 * 1000L)
-                    )
-                    .apply();
-
-            // מודיע למסך הראשי שנקבעה דחייה
-            Intent updateIntent =
-                    new Intent("com.ariberman.altishkachtefillin.TEFILLIN_SNOOZE");
-            updateIntent.setPackage(getPackageName());
-            sendBroadcast(updateIntent);
-
-            // סוגר את חלון הצלצול מיד
-            finishAndRemoveTask();
-        });
+        snoozeButton.setOnClickListener(v -> snoozeTenMinutes());
     }
 
     private void startAlarm() {
 
         try {
-            Uri alarmUri =
-                    RingtoneManager.getDefaultUri(
-                            RingtoneManager.TYPE_ALARM
-                    );
+            Uri alarmUri = getSelectedAlarmUri();
 
-            if (alarmUri == null) {
-                alarmUri =
-                        RingtoneManager.getDefaultUri(
-                                RingtoneManager.TYPE_NOTIFICATION
-                        );
-            }
+            mediaPlayer = new MediaPlayer();
 
-            ringtone =
-                    RingtoneManager.getRingtone(
-                            getApplicationContext(),
-                            alarmUri
-                    );
+            mediaPlayer.setDataSource(this, alarmUri);
 
-            if (ringtone != null) {
+            mediaPlayer.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(
+                                    AudioAttributes.CONTENT_TYPE_SONIFICATION
+                            )
+                            .build()
+            );
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    ringtone.setAudioAttributes(
-                            new AudioAttributes.Builder()
-                                    .setUsage(AudioAttributes.USAGE_ALARM)
-                                    .setContentType(
-                                            AudioAttributes.CONTENT_TYPE_SONIFICATION
-                                    )
-                                    .build()
-                    );
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    ringtone.setLooping(true);
-                }
-
-                ringtone.play();
-            }
+            mediaPlayer.setLooping(true);
+            mediaPlayer.prepare();
+            mediaPlayer.start();
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        vibrator =
-                (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        startVibration();
+    }
 
-        if (vibrator != null && vibrator.hasVibrator()) {
+    /*
+     * כאן נשמר הצלצול שהמשתמש בחר.
+     * בשלב הבא נחבר למסך הבחירה של 10 הצלצולים.
+     */
+    private Uri getSelectedAlarmUri() {
 
-            long[] pattern = {0, 700, 400, 700, 400};
+        String savedUri =
+                prefs.getString("selected_ringtone_uri", null);
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(
-                        VibrationEffect.createWaveform(pattern, 0)
+        if (savedUri != null && !savedUri.isEmpty()) {
+            return Uri.parse(savedUri);
+        }
+
+        Uri uri =
+                RingtoneManager.getDefaultUri(
+                        RingtoneManager.TYPE_ALARM
                 );
-            } else {
-                vibrator.vibrate(pattern, 0);
-            }
+
+        if (uri == null) {
+            uri = RingtoneManager.getDefaultUri(
+                    RingtoneManager.TYPE_NOTIFICATION
+            );
+        }
+
+        return uri;
+    }
+
+    private void startVibration() {
+
+        vibrator =
+                (Vibrator) getSystemService(VIBRATOR_SERVICE);
+
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return;
+        }
+
+        long[] pattern = {
+                0,
+                800,
+                400,
+                800,
+                400
+        };
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+            vibrator.vibrate(
+                    VibrationEffect.createWaveform(
+                            pattern,
+                            0
+                    )
+            );
+
+        } else {
+            vibrator.vibrate(pattern, 0);
         }
     }
 
-    private void stopAlarm() {
+    private void markAsDone() {
 
-        try {
-            if (ringtone != null && ringtone.isPlaying()) {
-                ringtone.stop();
-            }
-        } catch (Exception ignored) {
-        }
+        stopAlarm();
 
-        if (vibrator != null) {
-            vibrator.cancel();
-        }
+        String today =
+                new SimpleDateFormat(
+                        "yyyy-MM-dd",
+                        Locale.US
+                ).format(new Date());
+
+        prefs.edit()
+                .putString("completed_date", today)
+                .putBoolean("completed_today", true)
+                .apply();
+
+        cancelCurrentNotification();
+
+        Toast.makeText(
+                this,
+                "סומן שהנחת תפילין ✓",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        finishAndRemoveTask();
     }
 
-    private void scheduleTenMinutes() {
+    private void snoozeTenMinutes() {
 
-        long triggerTime =
-                System.currentTimeMillis() + (10 * 60 * 1000L);
+        String today =
+                new SimpleDateFormat(
+                        "yyyy-MM-dd",
+                        Locale.US
+                ).format(new Date());
+
+        String completedDate =
+                prefs.getString("completed_date", "");
+
+        if (today.equals(completedDate)) {
+
+            Toast.makeText(
+                    this,
+                    "כבר סימנת שהנחת תפילין היום",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
+        stopAlarm();
+
+        long nextAlarm =
+                System.currentTimeMillis() +
+                        (10 * 60 * 1000L);
 
         Intent intent =
-                new Intent(this, ReminderReceiver.class);
+                new Intent(
+                        this,
+                        ReminderReceiver.class
+                );
 
         PendingIntent pendingIntent =
                 PendingIntent.getBroadcast(
                         this,
-                        5010,
+                        ALARM_REQUEST_CODE,
                         intent,
                         PendingIntent.FLAG_UPDATE_CURRENT |
                                 PendingIntent.FLAG_IMMUTABLE
                 );
 
         AlarmManager alarmManager =
-                (AlarmManager) getSystemService(ALARM_SERVICE);
+                (AlarmManager)
+                        getSystemService(ALARM_SERVICE);
 
-        if (alarmManager == null) return;
+        if (alarmManager != null) {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.S &&
+                    !alarmManager.canScheduleExactAlarms()) {
 
-            try {
-                alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerTime,
-                        pendingIntent
-                );
-            } catch (SecurityException e) {
                 alarmManager.setAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP,
-                        triggerTime,
+                        nextAlarm,
+                        pendingIntent
+                );
+
+            } else {
+
+                alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        nextAlarm,
                         pendingIntent
                 );
             }
+        }
 
-        } else {
-            alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-            );
+        prefs.edit()
+                .putLong("snooze_until", nextAlarm)
+                .apply();
+
+        cancelCurrentNotification();
+
+        Toast.makeText(
+                this,
+                "נזכיר לך שוב בעוד 10 דקות",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        finishAndRemoveTask();
+    }
+
+    private void cancelCurrentNotification() {
+
+        NotificationManager manager =
+                (NotificationManager)
+                        getSystemService(
+                                NOTIFICATION_SERVICE
+                        );
+
+        if (manager != null) {
+            manager.cancel(NOTIFICATION_ID);
+        }
+    }
+
+    private void stopAlarm() {
+
+        if (mediaPlayer != null) {
+
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+            } catch (Exception ignored) {
+            }
+
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
+        if (vibrator != null) {
+            vibrator.cancel();
         }
     }
 
@@ -288,8 +356,7 @@ public class AlarmActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        // לא מאפשרים לכפתור חזרה להשאיר צלצול פעיל ברקע
-        stopAlarm();
-        super.onBackPressed();
+        // לא מאפשרים לסגור בטעות את מסך הצלצול
+        // בלי לבחור "הנחתי" או "עוד 10 דקות".
     }
 }
