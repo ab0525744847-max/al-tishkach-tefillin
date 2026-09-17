@@ -11,22 +11,16 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.view.Gravity;
-import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
@@ -39,37 +33,17 @@ public class MainActivity extends Activity {
     private static final String WEBSITE_URL =
             "https://mildly-puck-wcst1.shipped.cloud/";
 
-    private static final String PREFS =
-            "tefillin_prefs";
+    private static final String PREFS = "tefillin_prefs";
 
-    private static final String KEY_RINGTONE =
-            "ringtone_uri";
+    private static final String KEY_RINGTONE = "ringtone_uri";
+    private static final String KEY_ALARM_TIME = "alarm_time";
+    private static final String KEY_ALARM_ACTIVE = "alarm_active";
+    private static final String KEY_DONE_DATE = "tefillin_done_date";
 
-    private static final String KEY_ALARM_TIME =
-            "alarm_time";
-
-    private static final String KEY_ALARM_ACTIVE =
-            "alarm_active";
-
-    private static final String KEY_DONE =
-            "tefillin_done";
-
-    private static final String KEY_DONE_DATE =
-            "tefillin_done_date";
-
-    private static final String KEY_OVERLAY_ASKED =
-            "overlay_permission_asked";
-
-    private static final int NOTIFICATION_PERMISSION_REQUEST =
-            100;
-
-    private static final int ALARM_REQUEST_CODE =
-            5001;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 100;
+    private static final int ALARM_REQUEST_CODE = 5001;
 
     private WebView webView;
-    private FrameLayout rootLayout;
-
-    private Ringtone previewRingtone;
 
     @SuppressLint({
             "SetJavaScriptEnabled",
@@ -79,162 +53,42 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        createScreen();
-        configureWebView();
+        webView = new WebView(this);
+        setContentView(webView);
 
-        askNotificationPermission();
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.getSettings().setDatabaseEnabled(true);
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
-        webView.loadUrl(WEBSITE_URL);
+        webView.setWebChromeClient(new WebChromeClient());
 
-        /*
-         * נותנים למסך הראשי להיפתח קודם,
-         * ואז בודקים את הרשאת ההצגה מעל אפליקציות.
-         */
-        webView.postDelayed(
-                this::checkOverlayPermission,
-                1000
-        );
-    }
-
-    private void createScreen() {
-
-        rootLayout =
-                new FrameLayout(this);
-
-        webView =
-                new WebView(this);
-
-        FrameLayout.LayoutParams webParams =
-                new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                );
-
-        rootLayout.addView(
-                webView,
-                webParams
-        );
-
-        /*
-         * כפתור בחירת הצלצול.
-         * הוא נשאר מעל האתר כדי שאפשר יהיה
-         * לבחור צלצול גם בלי לשנות את קוד האתר.
-         */
-        Button ringtoneButton =
-                new Button(this);
-
-        ringtoneButton.setText(
-                "🔔 צלצול"
-        );
-
-        ringtoneButton.setTextSize(14);
-
-        ringtoneButton.setAllCaps(false);
-
-        ringtoneButton.setTextColor(
-                Color.rgb(
-                        15,
-                        25,
-                        50
-                )
-        );
-
-        ringtoneButton.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        FrameLayout.LayoutParams buttonParams =
-                new FrameLayout.LayoutParams(
-                        260,
-                        125
-                );
-
-        buttonParams.gravity =
-                Gravity.BOTTOM |
-                        Gravity.END;
-
-        buttonParams.setMargins(
-                25,
-                25,
-                30,
-                45
-        );
-
-        ringtoneButton.setLayoutParams(
-                buttonParams
-        );
-
-        ringtoneButton.setOnClickListener(
-                v -> showRingtoneChooser()
-        );
-
-        rootLayout.addView(
-                ringtoneButton
-        );
-
-        setContentView(
-                rootLayout
-        );
-    }
-
-    @SuppressLint({
-            "SetJavaScriptEnabled",
-            "JavascriptInterface"
-    })
-    private void configureWebView() {
-
-        webView.getSettings()
-                .setJavaScriptEnabled(true);
-
-        webView.getSettings()
-                .setDomStorageEnabled(true);
-
-        webView.getSettings()
-                .setDatabaseEnabled(true);
-
-        webView.getSettings()
-                .setMediaPlaybackRequiresUserGesture(false);
-
-        webView.setWebChromeClient(
-                new WebChromeClient()
-        );
-
-        webView.setWebViewClient(
-                new WebViewClient() {
-
-                    @Override
-                    public void onPageFinished(
-                            WebView view,
-                            String url
-                    ) {
-                        super.onPageFinished(
-                                view,
-                                url
-                        );
-
-                        notifyWebsiteAppReady();
-                    }
-                }
-        );
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                notifyWebsiteAppReady();
+            }
+        });
 
         webView.addJavascriptInterface(
                 new AndroidBridge(),
                 "Android"
         );
+
+        askNotificationPermission();
+
+        webView.loadUrl(WEBSITE_URL);
     }
 
-    /*
-     * הרשאת התראות Android 13+
-     */
+    // ---------------------------------------------------------
+    // Notification permission
+    // ---------------------------------------------------------
+
     private void askNotificationPermission() {
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.TIRAMISU) {
-
-            if (checkSelfPermission(
-                    Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
 
                 requestPermissions(
                         new String[]{
@@ -246,16 +100,72 @@ public class MainActivity extends Activity {
         }
     }
 
-    /*
-     * הרשאת "הצגה מעל אפליקציות אחרות".
-     *
-     * Android לא מאפשר לאפליקציה לאשר אותה בעצמה.
-     * המשתמש חייב להפעיל אותה במסך ההגדרות.
-     */
-    private void checkOverlayPermission() {
+    // ---------------------------------------------------------
+    // Exact alarm permission
+    // ---------------------------------------------------------
 
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.M) {
+    private boolean canScheduleExactAlarm() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return true;
+        }
+
+        AlarmManager alarmManager =
+                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        return alarmManager != null
+                && alarmManager.canScheduleExactAlarms();
+    }
+
+    private void requestExactAlarmPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+
+        AlarmManager alarmManager =
+                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+        if (alarmManager == null) {
+            return;
+        }
+
+        if (alarmManager.canScheduleExactAlarms()) {
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+            );
+
+            intent.setData(
+                    Uri.parse("package:" + getPackageName())
+            );
+
+            startActivity(intent);
+
+        } catch (Exception e) {
+            Toast.makeText(
+                    this,
+                    "יש לאפשר לאפליקציה תזכורות מדויקות",
+                    Toast.LENGTH_LONG
+            ).show();
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Display over other apps permission
+    // ---------------------------------------------------------
+
+    private boolean canDrawOverlays() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return true;
+        }
+
+        return Settings.canDrawOverlays(this);
+    }
+
+    private void openOverlayPermissionScreen() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             return;
         }
 
@@ -263,196 +173,60 @@ public class MainActivity extends Activity {
             return;
         }
 
-        SharedPreferences prefs =
-                getSharedPreferences(
-                        PREFS,
-                        MODE_PRIVATE
-                );
-
-        boolean alreadyAsked =
-                prefs.getBoolean(
-                        KEY_OVERLAY_ASKED,
-                        false
-                );
-
-        /*
-         * בפעם הראשונה מציגים הסבר.
-         * לאחר מכן המשתמש עדיין יכול לפתוח
-         * את ההרשאה דרך Android Bridge.
-         */
-        if (!alreadyAsked) {
-
-            new AlertDialog.Builder(this)
-                    .setTitle(
-                            "הרשאה לתזכורת"
-                    )
-                    .setMessage(
-                            "כדי שמסך התזכורת יוכל להופיע מעל אפליקציות אחרות, צריך לאפשר לאפליקציה \"הצגה מעל אפליקציות אחרות\"."
-                    )
-                    .setPositiveButton(
-                            "פתח הגדרות",
-                            (dialog, which) -> {
-
-                                prefs.edit()
-                                        .putBoolean(
-                                                KEY_OVERLAY_ASKED,
-                                                true
-                                        )
-                                        .apply();
-
-                                openOverlaySettings();
-                            }
-                    )
-                    .setNegativeButton(
-                            "לא עכשיו",
-                            (dialog, which) -> {
-
-                                prefs.edit()
-                                        .putBoolean(
-                                                KEY_OVERLAY_ASKED,
-                                                true
-                                        )
-                                        .apply();
-                            }
-                    )
-                    .setCancelable(false)
-                    .show();
-        }
-    }
-
-    private void openOverlaySettings() {
-
-        if (Build.VERSION.SDK_INT <
-                Build.VERSION_CODES.M) {
-            return;
-        }
-
         try {
-
-            Intent intent =
-                    new Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION
-                    );
-
-            intent.setData(
-                    Uri.parse(
-                            "package:" +
-                                    getPackageName()
-                    )
+            Intent intent = new Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName())
             );
 
             startActivity(intent);
 
         } catch (Exception firstError) {
-
-            /*
-             * גיבוי למכשירים שבהם היצרן
-             * שינה את מסך ההרשאות.
-             */
             try {
-
-                Intent intent =
-                        new Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION
-                        );
+                Intent intent = new Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+                );
 
                 startActivity(intent);
 
             } catch (Exception secondError) {
-
                 Toast.makeText(
                         this,
-                        "פתח בהגדרות את ההרשאה: הצגה מעל אפליקציות אחרות",
+                        "לא ניתן לפתוח את הגדרת ההצגה מעל אפליקציות",
                         Toast.LENGTH_LONG
                 ).show();
             }
         }
     }
 
-    /*
-     * הרשאת תזכורות מדויקות Android 12+
-     */
-    private void requestExactAlarmPermissionIfNeeded() {
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.S) {
-
-            AlarmManager alarmManager =
-                    (AlarmManager)
-                            getSystemService(
-                                    Context.ALARM_SERVICE
-                            );
-
-            if (alarmManager != null &&
-                    !alarmManager.canScheduleExactAlarms()) {
-
-                try {
-
-                    Intent intent =
-                            new Intent(
-                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
-                            );
-
-                    intent.setData(
-                            Uri.parse(
-                                    "package:" +
-                                            getPackageName()
-                            )
-                    );
-
-                    startActivity(intent);
-
-                } catch (Exception ignored) {
-                }
-            }
-        }
-    }
+    // ---------------------------------------------------------
+    // Alarm PendingIntent
+    // ---------------------------------------------------------
 
     private PendingIntent getReminderPendingIntent() {
-
         Intent intent =
-                new Intent(
-                        this,
-                        ReminderReceiver.class
-                );
+                new Intent(this, ReminderReceiver.class);
 
-        intent.setAction(
-                "TEFILLIN_REMINDER"
-        );
+        intent.setAction("TEFILLIN_REMINDER");
 
         return PendingIntent.getBroadcast(
                 this,
                 ALARM_REQUEST_CODE,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT |
-                        PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT
+                        | PendingIntent.FLAG_IMMUTABLE
         );
     }
 
-    /*
-     * קביעת תזכורת.
-     */
-    private void scheduleAlarm(
-            long triggerAtMillis
-    ) {
+    // ---------------------------------------------------------
+    // Schedule alarm
+    // ---------------------------------------------------------
 
-        if (isTefillinDoneToday()) {
-
+    private void scheduleAlarm(long triggerAtMillis) {
+        if (triggerAtMillis <= System.currentTimeMillis()) {
             Toast.makeText(
                     this,
-                    "כבר סימנת שהנחת תפילין היום",
-                    Toast.LENGTH_SHORT
-            ).show();
-
-            return;
-        }
-
-        if (triggerAtMillis <=
-                System.currentTimeMillis()) {
-
-            Toast.makeText(
-                    this,
-                    "שעת התזכורת כבר עברה",
+                    "זמן התזכורת כבר עבר",
                     Toast.LENGTH_SHORT
             ).show();
 
@@ -460,16 +234,24 @@ public class MainActivity extends Activity {
         }
 
         AlarmManager alarmManager =
-                (AlarmManager)
-                        getSystemService(
-                                Context.ALARM_SERVICE
-                        );
+                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
         if (alarmManager == null) {
+            Toast.makeText(
+                    this,
+                    "לא ניתן להפעיל את מערכת התזכורות",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
+        if (!canScheduleExactAlarm()) {
+            requestExactAlarmPermissionIfNeeded();
 
             Toast.makeText(
                     this,
-                    "לא ניתן להפעיל את התזכורת",
+                    "יש לאפשר תזכורות מדויקות ואז לשמור שוב את התזכורת",
                     Toast.LENGTH_LONG
             ).show();
 
@@ -477,292 +259,447 @@ public class MainActivity extends Activity {
         }
 
         try {
-
-            if (Build.VERSION.SDK_INT >=
-                    Build.VERSION_CODES.S &&
-                    !alarmManager.canScheduleExactAlarms()) {
-
-                requestExactAlarmPermissionIfNeeded();
-
-                Toast.makeText(
-                        this,
-                        "צריך לאפשר לאפליקציה תזכורות מדויקות",
-                        Toast.LENGTH_LONG
-                ).show();
-
-                return;
-            }
-
             alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,
                     getReminderPendingIntent()
             );
 
-            getSharedPreferences(
-                    PREFS,
-                    MODE_PRIVATE
-            )
+            getSharedPreferences(PREFS, MODE_PRIVATE)
                     .edit()
-                    .putLong(
-                            KEY_ALARM_TIME,
-                            triggerAtMillis
-                    )
-                    .putBoolean(
-                            KEY_ALARM_ACTIVE,
-                            true
-                    )
+                    .putLong(KEY_ALARM_TIME, triggerAtMillis)
+                    .putBoolean(KEY_ALARM_ACTIVE, true)
                     .apply();
 
             Toast.makeText(
                     this,
-                    "התזכורת נשמרה ✓",
+                    "התזכורת נשמרה",
                     Toast.LENGTH_SHORT
             ).show();
 
-            notifyWebsiteReminderChanged(
-                    triggerAtMillis,
-                    true
-            );
-
         } catch (SecurityException e) {
-
             requestExactAlarmPermissionIfNeeded();
-
-        } catch (Exception e) {
 
             Toast.makeText(
                     this,
-                    "אירעה בעיה בשמירת התזכורת",
+                    "יש לאפשר תזכורות מדויקות",
+                    Toast.LENGTH_LONG
+            ).show();
+
+        } catch (Exception e) {
+            Toast.makeText(
+                    this,
+                    "לא הצלחנו לשמור את התזכורת",
                     Toast.LENGTH_LONG
             ).show();
         }
     }
 
-    /*
-     * ביטול תזכורת.
-     */
-    private void cancelAlarm() {
+    // ---------------------------------------------------------
+    // Cancel alarm
+    // ---------------------------------------------------------
 
+    private void cancelAlarm() {
         AlarmManager alarmManager =
-                (AlarmManager)
-                        getSystemService(
-                                Context.ALARM_SERVICE
-                        );
+                (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
         if (alarmManager != null) {
-
-            try {
-
-                alarmManager.cancel(
-                        getReminderPendingIntent()
-                );
-
-            } catch (Exception ignored) {
-            }
+            alarmManager.cancel(
+                    getReminderPendingIntent()
+            );
         }
 
-        getSharedPreferences(
-                PREFS,
-                MODE_PRIVATE
-        )
+        getSharedPreferences(PREFS, MODE_PRIVATE)
                 .edit()
-                .putBoolean(
-                        KEY_ALARM_ACTIVE,
-                        false
-                )
-                .remove(
-                        KEY_ALARM_TIME
-                )
+                .putBoolean(KEY_ALARM_ACTIVE, false)
+                .remove(KEY_ALARM_TIME)
                 .apply();
-
-        notifyWebsiteReminderChanged(
-                0,
-                false
-        );
     }
 
-    /*
-     * בחירת עד 10 צלצולי Alarm מהמכשיר.
-     */
-    private void showRingtoneChooser() {
+    // ---------------------------------------------------------
+    // Ringtone chooser
+    // ---------------------------------------------------------
 
-        stopPreviewRingtone();
+    private void showRingtoneChooser() {
+        RingtoneManager manager =
+                new RingtoneManager(this);
+
+        manager.setType(
+                RingtoneManager.TYPE_ALARM
+        );
 
         Cursor cursor = null;
 
+        final ArrayList<String> names =
+                new ArrayList<>();
+
+        final ArrayList<String> uris =
+                new ArrayList<>();
+
         try {
-
-            RingtoneManager manager =
-                    new RingtoneManager(this);
-
-            manager.setType(
-                    RingtoneManager.TYPE_ALARM
-            );
-
-            cursor =
-                    manager.getCursor();
-
-            ArrayList<String> names =
-                    new ArrayList<>();
-
-            ArrayList<String> uris =
-                    new ArrayList<>();
+            cursor = manager.getCursor();
 
             int count = 0;
 
-            while (cursor.moveToNext() &&
-                    count < 10) {
+            while (cursor != null
+                    && cursor.moveToNext()
+                    && count < 10) {
 
-                Uri uri =
-                        manager.getRingtoneUri(
-                                cursor.getPosition()
-                        );
+                int position =
+                        cursor.getPosition();
 
-                if (uri == null) {
+                Uri ringtoneUri =
+                        manager.getRingtoneUri(position);
+
+                if (ringtoneUri == null) {
                     continue;
                 }
 
                 String title =
-                        "צלצול " +
-                                (count + 1);
+                        "צלצול " + (count + 1);
 
                 try {
-
                     Ringtone ringtone =
                             RingtoneManager.getRingtone(
                                     this,
-                                    uri
+                                    ringtoneUri
                             );
 
                     if (ringtone != null) {
+                        String ringtoneTitle =
+                                ringtone.getTitle(this);
 
-                        String phoneTitle =
-                                ringtone.getTitle(
-                                        this
-                                );
+                        if (ringtoneTitle != null
+                                && !ringtoneTitle.trim().isEmpty()) {
 
-                        if (phoneTitle != null &&
-                                !phoneTitle.trim().isEmpty()) {
-
-                            title =
-                                    phoneTitle;
+                            title = ringtoneTitle;
                         }
                     }
 
                 } catch (Exception ignored) {
+                    // Keep fallback title.
                 }
 
                 names.add(
-                        "🔔 " + title
+                        (count + 1) + ". " + title
                 );
 
                 uris.add(
-                        uri.toString()
+                        ringtoneUri.toString()
                 );
 
                 count++;
             }
 
-            if (names.isEmpty()) {
-
-                Toast.makeText(
-                        this,
-                        "לא נמצאו צלצולי שעון מעורר",
-                        Toast.LENGTH_LONG
-                ).show();
-
-                return;
-            }
-
-            String[] options =
-                    names.toArray(
-                            new String[0]
-                    );
-
-            new AlertDialog.Builder(this)
-                    .setTitle(
-                            "בחר צלצול לתזכורת"
-                    )
-                    .setItems(
-                            options,
-                            (dialog, which) -> {
-
-                                if (which < 0 ||
-                                        which >= uris.size()) {
-                                    return;
-                                }
-
-                                String selected =
-                                        uris.get(which);
-
-                                getSharedPreferences(
-                                        PREFS,
-                                        MODE_PRIVATE
-                                )
-                                        .edit()
-                                        .putString(
-                                                KEY_RINGTONE,
-                                                selected
-                                        )
-                                        .apply();
-
-                                previewRingtone(
-                                        selected
-                                );
-
-                                Toast.makeText(
-                                        this,
-                                        "הצלצול נשמר ✓",
-                                        Toast.LENGTH_SHORT
-                                ).show();
-
-                                notifyWebsiteRingtoneChanged();
-                            }
-                    )
-                    .setNegativeButton(
-                            "ביטול",
-                            null
-                    )
-                    .show();
-
         } catch (Exception e) {
-
             Toast.makeText(
                     this,
-                    "לא ניתן לפתוח את רשימת הצלצולים",
+                    "לא ניתן לקרוא את רשימת הצלצולים",
                     Toast.LENGTH_LONG
             ).show();
 
         } finally {
-
             if (cursor != null) {
-
-                try {
-                    cursor.close();
-                } catch (Exception ignored) {
-                }
+                cursor.close();
             }
+        }
+
+        if (names.isEmpty()) {
+            Toast.makeText(
+                    this,
+                    "לא נמצאו צלצולי שעון מעורר",
+                    Toast.LENGTH_LONG
+            ).show();
+
+            return;
+        }
+
+        String[] ringtoneNames =
+                names.toArray(new String[0]);
+
+        new AlertDialog.Builder(this)
+                .setTitle("בחר צלצול לתזכורת")
+                .setItems(
+                        ringtoneNames,
+                        (dialog, which) -> {
+                            if (which < 0
+                                    || which >= uris.size()) {
+                                return;
+                            }
+
+                            String selectedUri =
+                                    uris.get(which);
+
+                            getSharedPreferences(
+                                    PREFS,
+                                    MODE_PRIVATE
+                            )
+                                    .edit()
+                                    .putString(
+                                            KEY_RINGTONE,
+                                            selectedUri
+                                    )
+                                    .apply();
+
+                            playPreview(selectedUri);
+
+                            Toast.makeText(
+                                    this,
+                                    "הצלצול נשמר",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                )
+                .setNegativeButton(
+                        "ביטול",
+                        null
+                )
+                .show();
+    }
+
+    // ---------------------------------------------------------
+    // Ringtone preview
+    // ---------------------------------------------------------
+
+    private void playPreview(String uriString) {
+        if (uriString == null
+                || uriString.trim().isEmpty()) {
+            return;
+        }
+
+        try {
+            Uri uri =
+                    Uri.parse(uriString);
+
+            final Ringtone ringtone =
+                    RingtoneManager.getRingtone(
+                            this,
+                            uri
+                    );
+
+            if (ringtone == null) {
+                return;
+            }
+
+            ringtone.play();
+
+            if (webView != null) {
+                webView.postDelayed(
+                        () -> {
+                            try {
+                                if (ringtone.isPlaying()) {
+                                    ringtone.stop();
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        },
+                        3000
+                );
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(
+                    this,
+                    "לא ניתן להשמיע את הצלצול",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
-    /*
-     * השמעת דוגמה של הצלצול למשך 3 שניות.
-     */
-    private void previewRingtone(
-            String uriString
-    ) {
+    // ---------------------------------------------------------
+    // Daily tefillin state
+    // ---------------------------------------------------------
 
-        stopPreviewRingtone();
+    private String todayKey() {
+        return new SimpleDateFormat(
+                "yyyy-MM-dd",
+                Locale.US
+        ).format(new Date());
+    }
 
-        try {
+    private boolean isTefillinDoneToday() {
+        String doneDate =
+                getSharedPreferences(
+                        PREFS,
+                        MODE_PRIVATE
+                )
+                        .getString(
+                                KEY_DONE_DATE,
+                                ""
+                        );
 
-            Uri uri =
-                    Uri.parse(
-                            uriString
+        return todayKey().equals(doneDate);
+    }
+
+    private void markTefillinDoneInternal() {
+        getSharedPreferences(
+                PREFS,
+                MODE_PRIVATE
+        )
+                .edit()
+                .putString(
+                        KEY_DONE_DATE,
+                        todayKey()
+                )
+                .putBoolean(
+                        "tefillin_done",
+                        true
+                )
+                .apply();
+
+        cancelAlarm();
+
+        notifyWebsiteTefillinDone();
+    }
+
+    // ---------------------------------------------------------
+    // Website events
+    // ---------------------------------------------------------
+
+    private void notifyWebsiteAppReady() {
+        if (webView == null) {
+            return;
+        }
+
+        webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('androidAppReady'));",
+                null
+        );
+    }
+
+    private void notifyWebsiteTefillinDone() {
+        if (webView == null) {
+            return;
+        }
+
+        webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('tefillinDone'));",
+                null
+        );
+    }
+
+    private void notifyWebsiteResumed() {
+        if (webView == null) {
+            return;
+        }
+
+        webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('androidAppResumed'));",
+                null
+        );
+    }
+
+    // ---------------------------------------------------------
+    // JavaScript <-> Android bridge
+    // ---------------------------------------------------------
+
+    public class AndroidBridge {
+
+        @JavascriptInterface
+        public void scheduleReminder(long timestamp) {
+            runOnUiThread(
+                    () -> scheduleAlarm(timestamp)
+            );
+        }
+
+        @JavascriptInterface
+        public void setReminder(long timestamp) {
+            scheduleReminder(timestamp);
+        }
+
+        @JavascriptInterface
+        public void cancelReminder() {
+            runOnUiThread(
+                    () -> cancelAlarm()
+            );
+        }
+
+        @JavascriptInterface
+        public void chooseRingtone() {
+            runOnUiThread(
+                    () -> showRingtoneChooser()
+            );
+        }
+
+        @JavascriptInterface
+        public String getSelectedRingtone() {
+            return getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            )
+                    .getString(
+                            KEY_RINGTONE,
+                            ""
                     );
+        }
 
-            previewRingtone =
-                    RingtoneManager.getRingtone(
-                            this,
-                  
+        @JavascriptInterface
+        public void requestOverlayPermission() {
+            runOnUiThread(
+                    () -> openOverlayPermissionScreen()
+            );
+        }
+
+        @JavascriptInterface
+        public boolean hasOverlayPermission() {
+            return canDrawOverlays();
+        }
+
+        @JavascriptInterface
+        public void requestExactAlarmPermission() {
+            runOnUiThread(
+                    () -> requestExactAlarmPermissionIfNeeded()
+            );
+        }
+
+        @JavascriptInterface
+        public boolean hasExactAlarmPermission() {
+            return canScheduleExactAlarm();
+        }
+
+        @JavascriptInterface
+        public void markTefillinDone() {
+            runOnUiThread(
+                    () -> markTefillinDoneInternal()
+            );
+        }
+
+        @JavascriptInterface
+        public boolean isTefillinDone() {
+            return isTefillinDoneToday();
+        }
+
+        @JavascriptInterface
+        public boolean isTefillinDoneToday() {
+            return MainActivity.this
+                    .isTefillinDoneToday();
+        }
+
+        @JavascriptInterface
+        public long getAlarmTime() {
+            return getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            )
+                    .getLong(
+                            KEY_ALARM_TIME,
+                            0L
+                    );
+        }
+
+        @JavascriptInterface
+        public boolean isAlarmActive() {
+            return getSharedPreferences(
+                    PREFS,
+                    MODE_PRIVATE
+            )
+                    .getBoolean(
+                            KEY_ALARM_ACTIVE,
+                            false
+                    );
+        }
+    }
+
+    // ---------------------------------------------------------
+    // Activity lifecycle
+    // ---
