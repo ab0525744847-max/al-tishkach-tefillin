@@ -1,11 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- אינטרנט -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- התראות -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- שעון מעורר מדויק -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- הפעלה מחדש אחרי כיבוי/הדלקה -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- רטט -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- הצגה מעל אפליקציות אחרות -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -13,27 +26,50 @@
         android:theme="@style/Theme.AlTishkachTefillin"
         android:usesCleartextTraffic="false">
 
+        <!-- האפליקציה הראשית -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait">
+
             <intent-filter>
+
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
+
             </intent-filter>
+
         </activity>
 
+
+        <!-- מסך הצלצול הגדול -->
+        <activity
+            android:name=".AlarmActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
+
+        <!-- מקבל את התזכורת -->
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />
 
+
+        <!-- מחזיר תזכורות לאחר הפעלת הטלפון -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
+
             <intent-filter>
+
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+
             </intent-filter>
+
         </receiver>
 
     </application>
