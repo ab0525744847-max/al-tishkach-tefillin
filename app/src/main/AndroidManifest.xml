@@ -2,35 +2,42 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- האתר בתוך האפליקציה -->
+    <!-- אינטרנט -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- התראות באנדרואיד 13 ומעלה -->
+    <!-- התראות -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- רטט בזמן הצלצול -->
+    <!-- רטט -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- תזכורות מדויקות -->
+    <!-- שעון מעורר מדויק -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- שחזור תזכורת לאחר הפעלת הטלפון -->
+    <!-- הפעלה מחדש של התזכורת אחרי אתחול הטלפון -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- אפשרות למסך התראה מלא -->
+    <!-- מסך התראה מלא -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
-    <!-- אפשרות להצגה מעל אפליקציות אחרות -->
+    <!-- הצגה מעל אפליקציות אחרות -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- הפעלת שירות בחזית לצלצול ממושך -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- נדרש לשירות שמנגן את צלצול האזעקה -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- שמירת המעבד ער בזמן שהאזעקה פועלת -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/app_icon"
         android:label="אל תשכח תפילין"
         android:supportsRtl="true"
         android:theme="@style/Theme.AlTishkachTefillin">
 
-        <!-- האפליקציה הראשית -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -42,7 +49,6 @@
 
         </activity>
 
-        <!-- מסך הצלצול -->
         <activity
             android:name=".AlarmActivity"
             android:exported="false"
@@ -51,18 +57,14 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- מקבל את התזכורת בזמן שנקבע -->
         <receiver
             android:name=".ReminderReceiver"
-            android:enabled="true"
             android:exported="false" />
 
-        <!-- מחזיר את התזכורת לאחר הפעלת הטלפון -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
-            android:exported="true"
-            android:directBootAware="true">
+            android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
