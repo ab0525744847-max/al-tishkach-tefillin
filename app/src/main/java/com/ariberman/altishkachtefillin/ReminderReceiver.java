@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
+import android.os.PowerManager;
 
 import androidx.core.app.NotificationCompat;
 
@@ -18,28 +19,71 @@ public class ReminderReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
-        // המסך שייפתח כאשר התזכורת מצלצלת
-        Intent alarmIntent = new Intent(context, AlarmActivity.class);
+        PowerManager powerManager =
+                (PowerManager) context.getSystemService(Context.POWER_SERVICE);
 
-        alarmIntent.addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                Intent.FLAG_ACTIVITY_SINGLE_TOP
-        );
+        PowerManager.WakeLock wakeLock = null;
 
-        PendingIntent alarmPendingIntent = PendingIntent.getActivity(
-                context,
-                1001,
-                alarmIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT |
-                        PendingIntent.FLAG_IMMUTABLE
-        );
+        if (powerManager != null) {
+            wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "AlTishkachTefillin:ReminderWakeLock"
+            );
 
-        NotificationManager manager =
-                (NotificationManager)
-                        context.getSystemService(Context.NOTIFICATION_SERVICE);
+            wakeLock.acquire(10000);
+        }
 
-        // ערוץ מיוחד להתראת תפילין
+        try {
+            createNotificationChannel(context);
+
+            Intent alarmIntent = new Intent(context, AlarmActivity.class);
+            alarmIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK |
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            );
+
+            PendingIntent fullScreenPendingIntent =
+                    PendingIntent.getActivity(
+                            context,
+                            3001,
+                            alarmIntent,
+                            PendingIntent.FLAG_UPDATE_CURRENT |
+                                    PendingIntent.FLAG_IMMUTABLE
+                    );
+
+            NotificationCompat.Builder builder =
+                    new NotificationCompat.Builder(context, CHANNEL_ID)
+                            .setSmallIcon(R.drawable.ic_notification)
+                            .setContentTitle("אל תשכח תפילין")
+                            .setContentText("הגיע הזמן להניח תפילין")
+                            .setPriority(NotificationCompat.PRIORITY_MAX)
+                            .setCategory(NotificationCompat.CATEGORY_ALARM)
+                            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                            .setAutoCancel(false)
+                            .setOngoing(true)
+                            .setContentIntent(fullScreenPendingIntent)
+                            .setFullScreenIntent(fullScreenPendingIntent, true);
+
+            NotificationManager manager =
+                    (NotificationManager)
+                            context.getSystemService(Context.NOTIFICATION_SERVICE);
+
+            if (manager != null) {
+                manager.notify(NOTIFICATION_ID, builder.build());
+            }
+
+            context.startActivity(alarmIntent);
+
+        } finally {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        }
+    }
+
+    private void createNotificationChannel(Context context) {
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 
             NotificationChannel channel =
@@ -49,43 +93,18 @@ public class ReminderReceiver extends BroadcastReceiver {
                             NotificationManager.IMPORTANCE_HIGH
                     );
 
-            channel.setDescription("התראת תזכורת להנחת תפילין");
+            channel.setDescription("התראת שעון מעורר להנחת תפילין");
             channel.enableVibration(true);
             channel.setLockscreenVisibility(
                     android.app.Notification.VISIBILITY_PUBLIC
             );
 
+            NotificationManager manager =
+                    context.getSystemService(NotificationManager.class);
+
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
-        }
-
-        NotificationCompat.Builder builder =
-                new NotificationCompat.Builder(context, CHANNEL_ID)
-                        .setSmallIcon(R.drawable.ic_notification)
-                        .setContentTitle("אל תשכח תפילין")
-                        .setContentText("הגיע הזמן להניח תפילין")
-                        .setPriority(NotificationCompat.PRIORITY_MAX)
-                        .setCategory(NotificationCompat.CATEGORY_ALARM)
-                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setAutoCancel(false)
-                        .setOngoing(true)
-                        .setContentIntent(alarmPendingIntent)
-                        .setFullScreenIntent(alarmPendingIntent, true);
-
-        if (manager != null) {
-            manager.notify(NOTIFICATION_ID, builder.build());
-        }
-
-        /*
-         * אם Android מאפשר פתיחת Activity ישירות ברקע,
-         * ננסה לפתוח את מסך הצלצול מיד.
-         * ה-Full Screen Intent למעלה משמש גם כאשר
-         * פתיחה ישירה ברקע מוגבלת.
-         */
-        try {
-            context.startActivity(alarmIntent);
-        } catch (Exception ignored) {
         }
     }
 }
