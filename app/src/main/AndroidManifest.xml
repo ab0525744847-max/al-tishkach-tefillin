@@ -1,36 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- אינטרנט בשביל האתר -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- התראות -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- רטט בזמן התזכורת -->
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- תזכורות מדויקות -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- הפעלה מחדש של התזכורת אחרי הדלקת הטלפון -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- הצגת מסך התזכורת במסך הנעילה -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- הצגה מעל אפליקציות אחרות -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
-        android:icon="@drawable/app_icon"
         android:label="אל תשכח תפילין"
         android:supportsRtl="true"
         android:theme="@style/Theme.AlTishkachTefillin">
 
         <activity
+            android:name=".MainActivity"
+            android:exported="true">
+
+            <intent-filter>
+
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+
+            </intent-filter>
+
+        </activity>
+
+        <activity
             android:name=".AlarmActivity"
             android:exported="false"
             android:excludeFromRecents="true"
+            android:launchMode="singleTask"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
 
         <receiver
             android:name=".ReminderReceiver"
@@ -40,9 +59,17 @@
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="true">
+
             <intent-filter>
+
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+
             </intent-filter>
+
         </receiver>
 
     </application>
